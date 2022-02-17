@@ -73,7 +73,28 @@ final class FriendsViewController: UITableViewController {
     if let image = imageCache.object(forKey: user.email as NSString) {
       cell.avatarImageView.image = image
     } else {
-      // request the avatar from Gravatar
+      // 1: Normalize the email according to Gravatar’s docs, then you create a MD5 hash.
+      let emailHash = user.email.trimmingCharacters(in: .whitespacesAndNewlines)
+                                .lowercased()
+                                .md5()
+
+      // 2: Construct the Gravatar URL and URLSession. You load a UIImage from the returned data.
+      if let url = URL(string: "https://www.gravatar.com/avatar/" + emailHash) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
+          guard let data = data, let image = UIImage(data: data) else {
+            return
+          }
+          
+          // 3: Cache the image to avoid repeat fetches for an email address.
+          self.imageCache.setObject(image, forKey: user.email as NSString)
+          
+          DispatchQueue.main.async {
+            // 4: Reload the row in the table view so the avatar image shows up.
+            self.tableView.reloadRows(at: [indexPath], with: .automatic)
+          }
+        }.resume()
+      }
+
     }
     
     return cell
